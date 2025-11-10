@@ -28,26 +28,62 @@ const client = new MongoClient(uri, {
   }
 });
 
-app.get('/' , (req, res) => {
-    res.send("the server is running from port 3000")
-})
+// app.get('/' , (req, res) => {
+//     res.send("the server is running from port 3000")
+// })
+
+const verifyToken = async (req, res, next) => {
+  const authorization = req.headers.authorization;
+
+  if (!authorization) {
+    return res.status(401).send({
+      message: "unauthorized access. Token not found!",
+    });
+  }
+
+  const token = authorization.split(" ")[1];
+  try {
+    await admin.auth().verifyIdToken(token);
+
+    next();
+  } catch (error) {
+    res.status(401).send({
+      message: "unauthorized access.",
+    });
+  }
+};
 
 async function run() {
     try {
         //await client.connect()
 
-        const skeletonDB = client.db("skeletondb")
-        const collection = skeletonDB.collection("books")
+        //get operations
+        app.get('/products', async ( req, res ) => {
+            const cursor = collection.find().sort({createdAt: 1})
+            const result = await cursor.toArray()
+            res.send(result)
+        })
+
+        //get a single 
+        app.get('/products/:id', verifyToken, async (req,res) => {
+            const id = req.params.id
+            const query = {_id: new ObjectId(id)}
+            const result = await collection.findOne(query)
+            res.send(result)
+        })
+
+        const skeletonDB = client.db("product_db")
+        const collection = skeletonDB.collection("products")
 
         // post operations
-        app.post('/books', async(req, res) => {
+        app.post('/products', async(req, res) => {
             const newBooks = req.body;
             const result = await collection.insertOne(newBooks)
             res.send(result)
         })
 
         //delete operations
-        app.delete('/books/:id', async(req, res) => {
+        app.delete('/products/:id', async(req, res) => {
             const id = req.params.id
             const query = {_id: new ObjectId(id)}
             const result = await collection.deleteOne(query)
@@ -55,7 +91,7 @@ async function run() {
         })
 
         // update operations
-        app.patch('/books/:id', async (req, res) =>{
+        app.patch('/products/:id', async (req, res) =>{
             const id = req.params.id
             const query = {_id: new ObjectId(id)}
             const updateNEW = req.body
@@ -70,20 +106,7 @@ async function run() {
             res.send(result)
         })
 
-        //get operations
-        app.get('/books', async ( req, res ) => {
-            const cursor = collection.find().sort({price: 1})
-            const result = await cursor.toArray()
-            res.send(result)
-        })
-
-        //get a single 
-        app.get('/books/:id', async (req,res) => {
-            const id = req.params.id
-            const query = {_id: new ObjectId(id)}
-            const result = await collection.findOne(query)
-            res.send(result)
-        })
+        
 
         //await client.db("admin").command({ ping: 1 });
          console.log("Pinged your deployment. You successfully connected to MongoDB!");
