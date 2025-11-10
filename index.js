@@ -57,7 +57,10 @@ async function run() {
     try {
         //await client.connect()
 
-        //get operations
+        const skeletonDB = client.db("product_db")
+        const collection = skeletonDB.collection("products")
+        
+         //get operations
         app.get('/products', async ( req, res ) => {
             const cursor = collection.find().sort({createdAt: 1})
             const result = await cursor.toArray()
@@ -66,29 +69,20 @@ async function run() {
 
         //get a single 
         app.get('/products/:id', verifyToken, async (req,res) => {
-            const id = req.params.id
-            const query = {_id: new ObjectId(id)}
-            const result = await collection.findOne(query)
-            res.send(result)
+            const {id} = req.params;
+            const query = new ObjectId(id);
+            const result = await collection.findOne({_id: query})
+            res.send({
+                success: true,
+                result})
         })
-
-        const skeletonDB = client.db("product_db")
-        const collection = skeletonDB.collection("products")
 
         // post operations
         app.post('/products', async(req, res) => {
-            const newBooks = req.body;
-            const result = await collection.insertOne(newBooks)
+            const newProduct = req.body;
+            const result = await collection.insertOne(newProduct)
             res.send(result)
-        })
-
-        //delete operations
-        app.delete('/products/:id', async(req, res) => {
-            const id = req.params.id
-            const query = {_id: new ObjectId(id)}
-            const result = await collection.deleteOne(query)
-            res.send(result)
-        })
+        });
 
         // update operations
         app.patch('/products/:id', async (req, res) =>{
@@ -104,7 +98,46 @@ async function run() {
 
             const result = await collection.updateOne(query, update)
             res.send(result)
+        });
+        
+           //Import 
+         app.post('/import', async (req, res) => {
+      const { productId, quantity } = req.body;
+
+      try {
+        if (!productId || !quantity) {
+          return res.status(400).json({ message: "Product ID and quantity are required." });
+        }
+
+        const query = { _id: new ObjectId(productId) };
+        const product = await collection.findOne(query);
+
+        if (!product) {
+          return res.status(404).json({ message: "Product not found." });
+        }
+
+        if (quantity > product.availableQuantity) {
+          return res.status(400).json({ message: "Import quantity exceeds available stock." });
+        }
+
+        await collection.updateOne(query, { $inc: { availableQuantity: -quantity } });
+
+        res.status(200).json({ message: "Product imported successfully!" });
+      } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Server error", error: error.message });
+      }
+    });
+
+        //delete operations
+        app.delete('/products/:id', async(req, res) => {
+            const id = req.params.id
+            const query = {_id: new ObjectId(id)}
+            const result = await collection.deleteOne(query)
+            res.send(result)
         })
+
+        
 
         
 
