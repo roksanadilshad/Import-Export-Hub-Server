@@ -158,7 +158,9 @@ async function run() {
       // Increment quantity in existing import record
       await importsCollection.updateOne(
         { productId: new ObjectId(productId) },
-        { $inc: { quantity: quantity }, $set: { lastImportBy: import_by, lastImportDate: new Date() } }
+        { $inc: { quantity: quantity }, 
+        $set: { lastImportBy: import_by,
+         lastImportDate: new Date() } }
       );
       return res.json({ message: "Import quantity updated." });
     } else {
@@ -198,11 +200,13 @@ async function run() {
               });
 
         //delete operations
-        app.delete('/products/:id', async(req, res) => {
-            const id = req.params.id
+        app.delete('/imports/:id', async(req, res) => {
+            const {id} = req.params
             const query = {_id: new ObjectId(id)}
-            const result = await collection.deleteOne(query)
-            res.send(result)
+            const result = await importsCollection.deleteOne(query)
+            res.send({
+              success: true,
+              result})
         })
 
         
