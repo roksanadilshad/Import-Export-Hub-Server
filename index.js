@@ -82,46 +82,58 @@ async function run() {
             res.send(result)
         })
 
-        // post operations for Import
-        app.post('/import', async(req, res) => {
-          try{
-            const {userId, productId, quantity} = req.body;
-            if (!userId || !productId || !quantity){
-              return res.status(400).json({message: 'Missing required fields'})
-            }
-            const importedProduct =await productsCollection.findOne({ _id: new ObjectId(productId) });
-           if(!importedProduct) return res.status(404).json({message:'product not found'})
-            const importData = {
-          userId,
-          productId,
-          productName: importedProduct.productName,
-          productImage: importedProduct.importedProductImage,
-          price: importedProduct.price,
-          rating: importedProduct.rating,
-          originCountry: importedProduct.originCountry,
-          quantity,
-          createdAt: new Date()
-        };
-        const result = await importsCollection.insertOne(importData);
- res.status(201).json({ message: 'Product imported', data: result });
-          }
-   catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Server error' });
-   }
-  
-    });
+        // 1. Get all imports of a user
+app.get('/imports/:userId', async (req, res) => {
+    const { userId } = req.params;
+    try {
+        const imports = await importCollection.find({ userId }).toArray();
+        res.status(200).json(imports);
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to fetch imports' });
+    }
+});
 
-    // GET: Get all imports for a user
-router.get('/:userId', async (req, res) => {
-  try {
-    const userId = req.params.userId;
-    const imports = await importsCollection.find({ userId }).toArray();
-    res.json(imports);
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Server error' });
-  }
+// 2. Add a product to imports
+app.post('/imports', async (req, res) => {
+    const { userId, productId, productImage, productName, price, rating, originCountry, quantity } = req.body;
+
+    if (!userId || !productId) {
+        return res.status(400).json({ error: 'User ID and Product ID are required' });
+    }
+
+    const importData = {
+        userId,
+        productId,
+        productImage,
+        productName,
+        price,
+        rating,
+        originCountry,
+        quantity: quantity || 1,
+        createdAt: new Date()
+    };
+
+    try {
+        const result = await importCollection.insertOne(importData);
+        res.status(201).json({ message: 'Product imported successfully', importId: result.insertedId });
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to import product' });
+    }
+});
+
+// 3. Remove an imported product
+app.delete('/imports/:importId', async (req, res) => {
+    const { importId } = req.params;
+    try {
+        const result = await importCollection.deleteOne({ _id: new ObjectId(importId) });
+        if (result.deletedCount === 1) {
+            res.status(200).json({ message: 'Import removed successfully' });
+        } else {
+            res.status(404).json({ error: 'Import not found' });
+        }
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to remove import' });
+    }
 });
 
         // update operations
@@ -141,11 +153,11 @@ router.get('/:userId', async (req, res) => {
         });
         
            //Import 
-         app.post('/import', async (req, res) => {
-      const { productId, quantity } = req.body;
+         app.post('/imports', verifyToken, async (req, res) => {
+      const {userId, productId, quantity } = req.body;
 
       try {
-        if (!productId || !quantity) {
+        if (!userId || !productId || !quantity) {
           return res.status(400).json({ message: "Product ID and quantity are required." });
         }
 
@@ -162,10 +174,23 @@ router.get('/:userId', async (req, res) => {
 
         await collection.updateOne(query, { $inc: { availableQuantity: -quantity } });
 
-        res.status(200).json({ message: "Product imported successfully!" });
+         const importData = {
+            userId,
+            productId,
+            productImage: product.productImage,
+            productName: product.productName,
+            price: product.price,
+            rating: product.rating,
+            originCountry: product.originCountry,
+            quantity,
+            createdAt: new Date(),
+        };
+
+        const result = await importCollection.insertOne(importData);
+        res.status(201).json({ message: "Product imported successfully!" , importId: result.insertedId});
       } catch (error) {
         console.error(error);
-        res.status(500).json({ message: "Server error", error: error.message });
+        res.status(500).json({ message: "Failed to import product" });
       }
     });
 
