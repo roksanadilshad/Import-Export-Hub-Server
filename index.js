@@ -82,45 +82,6 @@ async function run() {
             res.send(result)
         })
 
-        // 1. Get all imports of a user
-app.get('/imports/:userId', async (req, res) => {
-    const { userId } = req.params;
-    try {
-        const imports = await importCollection.find({ userId }).toArray();
-        res.status(200).json(imports);
-    } catch (err) {
-        res.status(500).json({ error: 'Failed to fetch imports' });
-    }
-});
-
-// 2. Add a product to imports
-app.post('/imports', async (req, res) => {
-    const { userId, productId, productImage, productName, price, rating, originCountry, quantity } = req.body;
-
-    if (!userId || !productId) {
-        return res.status(400).json({ error: 'User ID and Product ID are required' });
-    }
-
-    const importData = {
-        userId,
-        productId,
-        productImage,
-        productName,
-        price,
-        rating,
-        originCountry,
-        quantity: quantity || 1,
-        createdAt: new Date()
-    };
-
-    try {
-        const result = await importCollection.insertOne(importData);
-        res.status(201).json({ message: 'Product imported successfully', importId: result.insertedId });
-    } catch (err) {
-        res.status(500).json({ error: 'Failed to import product' });
-    }
-});
-
 // 3. Remove an imported product
 app.delete('/imports/:importId', async (req, res) => {
     const { importId } = req.params;
@@ -154,12 +115,12 @@ app.delete('/imports/:importId', async (req, res) => {
         
            //Import 
          app.post('/imports', verifyToken, async (req, res) => {
-      const {userId, productId, quantity } = req.body;
+            const {userId, productId, quantity } = req.body;
 
+             if (!userId || !productId || !quantity) {
+               return res.status(400).json({ message: "Product ID and quantity are required." });
+              }
       try {
-        if (!userId || !productId || !quantity) {
-          return res.status(400).json({ message: "Product ID and quantity are required." });
-        }
 
         const query = { _id: new ObjectId(productId) };
         const product = await collection.findOne(query);
