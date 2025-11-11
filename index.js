@@ -57,23 +57,15 @@ async function run() {
     try {
         //await client.connect()
 
-        const productDB = client.db("product_db")
-        const collection = productDB.collection("products")
-        const importCollection = productDB.collection('imports')
+        const skeletonDB = client.db("product_db")
+        const collection = skeletonDB.collection("products")
+        const importsCollection = skeletonDB.collection("imports")
+        
          //get operations
         app.get('/products', async ( req, res ) => {
-            const cursor = collection.find();
+            const cursor = collection.find()
             const result = await cursor.toArray()
             res.send(result)
-        })
-        //get a single 
-         app.get('/products/:id', verifyToken, async (req,res) => {
-            const {id} = req.params;
-            const query = new ObjectId(id);
-            const result = await collection.findOne({_id: query})
-            res.send({
-                success: true,
-                result})
         })
          //get operations
         app.get('/latest-products', async ( req, res ) => {
@@ -82,20 +74,22 @@ async function run() {
             res.send(result)
         })
 
-// 3. Remove an imported product
-app.delete('/imports/:importId', async (req, res) => {
-    const { importId } = req.params;
-    try {
-        const result = await importCollection.deleteOne({ _id: new ObjectId(importId) });
-        if (result.deletedCount === 1) {
-            res.status(200).json({ message: 'Import removed successfully' });
-        } else {
-            res.status(404).json({ error: 'Import not found' });
-        }
-    } catch (err) {
-        res.status(500).json({ error: 'Failed to remove import' });
-    }
-});
+        //get a single 
+        app.get('/products/:id',  async (req,res) => {
+            const {id} = req.params;
+            const query = new ObjectId(id);
+            const result = await collection.findOne({_id: query})
+            res.send({
+                success: true,
+                result})
+        })
+
+        // post operations
+        app.post('/products', async(req, res) => {
+            const newProduct = req.body;
+            const result = await collection.insertOne(newProduct)
+            res.send(result)
+        });
 
         // update operations
         app.patch('/products/:id', async (req, res) =>{
@@ -112,48 +106,96 @@ app.delete('/imports/:importId', async (req, res) => {
             const result = await collection.updateOne(query, update)
             res.send(result)
         });
-        
-           //Import 
-         app.post('/imports', verifyToken, async (req, res) => {
-            const {userId, productId, quantity } = req.body;
 
-             if (!userId || !productId || !quantity) {
-               return res.status(400).json({ message: "Product ID and quantity are required." });
-              }
-      try {
+         app.post("/imports", async(req, res) => {
+      const data = req.body
+      //const id = req.params.id
+      
+      const result = await importsCollection.insertOne(data)
+      res.send(result)
+      });
 
-        const query = { _id: new ObjectId(productId) };
-        const product = await collection.findOne(query);
+      app.get("/my-imports",  async(req, res) => {
+      const email = req.query.email
+      const result = await importsCollection.find({import_by: email}).toArray()
+      res.send(result)
+    })
+    app.get('/my-imports/:id',  async (req,res) => {
+            const {id} = req.params;
+            const query = new ObjectId(id);
+            const result = await importsCollection.findOne({_id: query})
+            res.send({
+                success: true,
+                result})
+        })
+      // Import product
+        app.post('/import', async (req, res) => {
+         const { productId, quantity, import_by } = req.body;
 
-        if (!product) {
-          return res.status(404).json({ message: "Product not found." });
-        }
+     try {
+    if (!ObjectId.isValid(productId)) {
+      return res.status(400).json({ message: "Invalid Product ID." });
+    }
 
-        if (quantity > product.availableQuantity) {
-          return res.status(400).json({ message: "Import quantity exceeds available stock." });
-        }
+    const query = { _id: new ObjectId(productId) };
+    const product = await collection.findOne(query);
 
-        await collection.updateOne(query, { $inc: { availableQuantity: -quantity } });
+    if (!product) {
+      return res.status(404).json({ message: "Product not found." });
+    }
 
-         const importData = {
-            userId,
-            productId,
-            productImage: product.productImage,
-            productName: product.productName,
-            price: product.price,
-            rating: product.rating,
-            originCountry: product.originCountry,
-            quantity,
-            createdAt: new Date(),
-        };
+    if (quantity > product.availableQuantity) {
+      return res.status(400).json({ message: "Import quantity exceeds available stock." });
+    }
 
-        const result = await importCollection.insertOne(importData);
-        res.status(201).json({ message: "Product imported successfully!" , importId: result.insertedId});
-      } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: "Failed to import product" });
-      }
-    });
+    // Decrease available quantity in main collection
+    await collection.updateOne(query, { $inc: { availableQuantity: -quantity } });
+
+    // Check if import record already exists for this product
+    const existingImport = await importsCollection.findOne({ productId: new ObjectId(productId) });
+
+    if (existingImport) {
+      // Increment quantity in existing import record
+      await importsCollection.updateOne(
+        { productId: new ObjectId(productId) },
+        { $inc: { quantity: quantity }, $set: { lastImportBy: import_by, lastImportDate: new Date() } }
+      );
+      return res.json({ message: "Import quantity updated." });
+    } else {
+      // Create new import record
+      const importRecord = {
+        productId: new ObjectId(productId),
+        quantity,
+        import_by,
+        importDate: new Date(),
+      };
+      await importsCollection.insertOne(importRecord);
+      return res.json({ message: "Product imported successfully." });
+    }
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Something went wrong." });
+  }
+});
+
+    
+           // Get user's import history
+              app.get("/my-imports", verifyToken, async (req, res) => {
+                try {
+                  const email = req.query.email;
+              
+                  if (!email) {
+                    return res.status(400).json({ message: "Email is required." });
+                  }
+              
+                  const result = await importsCollection.find({ import_by: email }).toArray();
+              
+                  res.send(result);
+                } catch (error) {
+                  console.error(error);
+                  res.status(500).json({ message: "Server error", error: error.message });
+                }
+              });
 
         //delete operations
         app.delete('/products/:id', async(req, res) => {
