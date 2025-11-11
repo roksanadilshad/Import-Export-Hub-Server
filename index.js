@@ -58,18 +58,18 @@ async function run() {
         //await client.connect()
 
         const skeletonDB = client.db("product_db")
-        const collection = skeletonDB.collection("products")
+        const productCollection = skeletonDB.collection("products")
         const importsCollection = skeletonDB.collection("imports")
         
          //get operations
         app.get('/products', async ( req, res ) => {
-            const cursor = collection.find()
+            const cursor = productCollection.find()
             const result = await cursor.toArray()
             res.send(result)
         })
          //get operations
         app.get('/latest-products', async ( req, res ) => {
-            const cursor = collection.find().sort({createdAt: 1})
+            const cursor = productCollection.find().sort({createdAt: 1})
             const result = await cursor.toArray()
             res.send(result)
         })
@@ -78,7 +78,7 @@ async function run() {
         app.get('/products/:id',  async (req,res) => {
             const {id} = req.params;
             const query = new ObjectId(id);
-            const result = await collection.findOne({_id: query})
+            const result = await productCollection.findOne({_id: query})
             res.send({
                 success: true,
                 result})
@@ -87,7 +87,7 @@ async function run() {
         // post operations
         app.post('/products', async(req, res) => {
             const newProduct = req.body;
-            const result = await collection.insertOne(newProduct)
+            const result = await productCollection.insertOne(newProduct)
             res.send(result)
         });
 
@@ -103,7 +103,7 @@ async function run() {
                 }
             }
 
-            const result = await collection.updateOne(query, update)
+            const result = await productCollection.updateOne(query, update)
             res.send(result)
         });
 
@@ -115,11 +115,12 @@ async function run() {
       res.send(result)
       });
 
-      app.get("/my-imports",  async(req, res) => {
-      const email = req.query.email
-      const result = await importsCollection.find({import_by: email}).toArray()
-      res.send(result)
-    })
+    //   app.get("/my-imports",  async(req, res) => {
+    //   const email = req.query.email
+    //   const result = await importsCollection.find({import_by: email}).toArray()
+    //   res.send(result)
+    // })
+ //my import id   
     app.get('/my-imports/:id',  async (req,res) => {
             const {id} = req.params;
             const query = new ObjectId(id);
@@ -128,55 +129,75 @@ async function run() {
                 success: true,
                 result})
         })
-      // Import product
-        app.post('/import', async (req, res) => {
-         const { productId, quantity, import_by } = req.body;
+// Import product
+        app.post('/imports', async (req, res) => {
+         const { productId, import_by } = req.body;
+            // let quantity = Number(req.body.quantity);
+            // if (isNaN(quantity) || quantity <= 0) {
+            //    return res.status(400).json({ success: false, message: "Invalid quantity" });
+            //  }
+             try {
+            if (!ObjectId.isValid(productId) || !quantity) {
+              return res.status(400).json({ message: "Invalid Product ID." });
+            }
 
-     try {
-    if (!ObjectId.isValid(productId)) {
-      return res.status(400).json({ message: "Invalid Product ID." });
-    }
+            const productObjectId = new ObjectId(productId);
 
-    const query = { _id: new ObjectId(productId) };
-    const product = await collection.findOne(query);
+            const product = await productCollection.findOne({_id: productObjectId});
+                
+             if (!product) {
+              return res.status(404).json({ message: "Product not found." });
+            }
 
-    if (!product) {
-      return res.status(404).json({ message: "Product not found." });
-    }
+             if (quantity > product.availableQuantity) {
+              return res.status(400).json({
+                success: false,
+                message: "Import quantity exceeds available stock." });
+            }
 
-    if (quantity > product.availableQuantity) {
-      return res.status(400).json({ message: "Import quantity exceeds available stock." });
-    }
-
-    // Decrease available quantity in main collection
-    await collection.updateOne(query, { $inc: { availableQuantity: -quantity } });
-
-    // Check if import record already exists for this product
-    const existingImport = await importsCollection.findOne({ productId: new ObjectId(productId) });
-
-    if (existingImport) {
-      // Increment quantity in existing import record
-      await importsCollection.updateOne(
-        { productId: new ObjectId(productId) },
-        { $inc: { quantity: quantity }, 
-        $set: { lastImportBy: import_by,
-         lastImportDate: new Date() } }
-      );
-      return res.json({ message: "Import quantity updated." });
-    } else {
+            //Decrease available quantity in main products collection
+            await productCollection.updateOne({_id: productObjectId}, 
+            { $inc: { availableQuantity: -quantity } });
+        
+            // Check if import record already exists for this product
+            const existingImport = await importsCollection.findOne({ productId: productObjectId, import_by });
+        
+            if (existingImport) {
+      // Update existing import
+      await importsCollection.insertOne(
+        { productId: productObjectId, import_by },
+        {
+        $inc: { quantity: quantity }, 
+        $set: { 
+         lastImportBy: import_by,
+         lastImportDate: new Date() 
+        } 
+      }
+    );
+      return res.json({ 
+        success:true,
+        message: "Import quantity updated." });
+    } 
+    else {
       // Create new import record
       const importRecord = {
-        productId: new ObjectId(productId),
+        productId: productObjectId,
         quantity,
         import_by,
         importDate: new Date(),
       };
+
       await importsCollection.insertOne(importRecord);
-      return res.json({ message: "Product imported successfully." });
+
+      return res.json({ 
+        success: true,
+        message: "Product imported successfully." });
     }
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: "Something went wrong." });
+    console.error("❌ Import route failed:",error);
+    res.status(500).json({
+      success: false,
+       message: "Something went wrong." });
   }
 });
 
