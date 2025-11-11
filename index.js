@@ -57,18 +57,17 @@ async function run() {
     try {
         //await client.connect()
 
-        const skeletonDB = client.db("product_db")
-        const collection = skeletonDB.collection("products")
-        
+        const productDB = client.db("product_db")
+        const collection = productDB.collection("products")
+        const importCollection = productDB.collection('imports')
          //get operations
         app.get('/products', async ( req, res ) => {
-            const cursor = collection.find().sort({createdAt: 1})
+            const cursor = collection.find();
             const result = await cursor.toArray()
             res.send(result)
         })
-
         //get a single 
-        app.get('/products/:id', verifyToken, async (req,res) => {
+         app.get('/products/:id', verifyToken, async (req,res) => {
             const {id} = req.params;
             const query = new ObjectId(id);
             const result = await collection.findOne({_id: query})
@@ -76,13 +75,54 @@ async function run() {
                 success: true,
                 result})
         })
-
-        // post operations
-        app.post('/products', async(req, res) => {
-            const newProduct = req.body;
-            const result = await collection.insertOne(newProduct)
+         //get operations
+        app.get('/latest-products', async ( req, res ) => {
+            const cursor = collection.find().sort({createdAt: 1})
+            const result = await cursor.toArray()
             res.send(result)
-        });
+        })
+
+        // post operations for Import
+        app.post('/import', async(req, res) => {
+          try{
+            const {userId, productId, quantity} = req.body;
+            if (!userId || !productId || !quantity){
+              return res.status(400).json({message: 'Missing required fields'})
+            }
+            const importedProduct =await productsCollection.findOne({ _id: new ObjectId(productId) });
+           if(!importedProduct) return res.status(404).json({message:'product not found'})
+            const importData = {
+          userId,
+          productId,
+          productName: importedProduct.productName,
+          productImage: importedProduct.importedProductImage,
+          price: importedProduct.price,
+          rating: importedProduct.rating,
+          originCountry: importedProduct.originCountry,
+          quantity,
+          createdAt: new Date()
+        };
+        const result = await importsCollection.insertOne(importData);
+ res.status(201).json({ message: 'Product imported', data: result });
+          }
+   catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Server error' });
+   }
+  
+    });
+
+    // GET: Get all imports for a user
+router.get('/:userId', async (req, res) => {
+  try {
+    const userId = req.params.userId;
+    const imports = await importsCollection.find({ userId }).toArray();
+    res.json(imports);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
 
         // update operations
         app.patch('/products/:id', async (req, res) =>{
