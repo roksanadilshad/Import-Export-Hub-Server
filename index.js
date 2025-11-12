@@ -60,6 +60,7 @@ async function run() {
         const skeletonDB = client.db("product_db")
         const productCollection = skeletonDB.collection("products")
         const importsCollection = skeletonDB.collection("imports")
+        // const exportsCollection = skeletonDB.collection("exports")
         
          //get operations
         app.get('/products', async ( req, res ) => {
@@ -88,7 +89,9 @@ async function run() {
         app.post('/products', async(req, res) => {
             const newProduct = req.body;
             const result = await productCollection.insertOne(newProduct)
-            res.send(result)
+            res.send({
+              success: true,
+              result})
         });
 
         // update operations
@@ -107,29 +110,48 @@ async function run() {
             res.send(result)
         });
 
-      //    app.post("/imports", async(req, res) => {
-      // const data = req.body
-      // //const id = req.params.id
-      
-      // const result = await importsCollection.insertOne(data)
-      // res.send(result)
-      // });
+//Export product
+        app.get("/my-exports",  async(req, res) => {
+      const email = req.query.email
+      const result = await productCollection.find({
+       exporterEmail: email}).toArray()
+      res.send(result)
+    })   
+    
+    //Update Export
+app.put("/exports/:id",  async (req, res) => {
+      const { id } = req.params;
+      const data = req.body;
+      // console.log(id)
+      // console.log(data)
+      const objectId = new ObjectId(id);
+      const filter = { _id: objectId };
+      const update = {
+        $set: data,
+      };
 
-    //   app.get("/my-imports",  async(req, res) => {
-    //   const email = req.query.email
-    //   const result = await importsCollection.find({import_by: email}).toArray()
-    //   res.send(result)
-    // })
- //my import id   
-    app.get('/my-imports/:id',  async (req,res) => {
-            const {id} = req.params;
-            const query = new ObjectId(id);
-            const result = await importsCollection.findOne({_id: query})
+      const result = await productCollection.updateOne(filter, update);
+
+      res.send({
+        success: true,
+        result,
+      });
+    });
+
+
+//Delete Export 
+ app.delete('/exports/:id', async(req, res) => {
+            const {id} = req.params
+            const query = {_id: new ObjectId(id)}
+            const result = await productCollection.deleteOne(query)
             res.send({
-                success: true,
-                result})
+              success: true,
+              result})
         })
-// Import product
+
+
+
+    // Import product
         app.post('/imports', async (req, res) => {
   try {
     console.log("🧠 Import request body:", req.body);
@@ -179,7 +201,7 @@ async function run() {
       productId: productObjectId,
       import_by,
     });
-    console.log("ℹ️ Existing import record:", existingImport);
+    console.log("Existing import record:", existingImport);
 
     if (existingImport) {
       await importsCollection.updateOne(
@@ -216,8 +238,15 @@ async function run() {
   }
 });
 
+    app.get('/my-imports/:id',  async (req,res) => {
+            const {id} = req.params;
+            const query = new ObjectId(id);
+            const result = await importsCollection.findOne({_id: query})
+            res.send({
+                success: true,
+                result})
+        })
 
-    
            // Get user's import history
              app.get("/my-imports", verifyToken, async (req, res) => {
   const email = req.query.email;
@@ -252,8 +281,6 @@ async function run() {
     res.status(500).json({ message: "Server error", error: err.message });
   }
 });
-
-
         //delete operations
         app.delete('/imports/:id', async(req, res) => {
             const {id} = req.params
@@ -263,10 +290,6 @@ async function run() {
               success: true,
               result})
         })
-
-        
-
-        
 
         //await client.db("admin").command({ ping: 1 });
          console.log("Pinged your deployment. You successfully connected to MongoDB!");
