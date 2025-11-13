@@ -76,7 +76,7 @@ async function run() {
         })
 
         //get a single 
-        app.get('/products/:id',  async (req,res) => {
+        app.get('/products/:id', verifyToken, async (req,res) => {
             const {id} = req.params;
             const query = new ObjectId(id);
             const result = await productCollection.findOne({_id: query})
@@ -95,7 +95,7 @@ async function run() {
         });
 
         // update operations
-        app.patch('/products/:id', async (req, res) =>{
+        app.patch('/products/:id', verifyToken, async (req, res) =>{
             const id = req.params.id
             const query = {_id: new ObjectId(id)}
             const updateNEW = req.body
@@ -110,6 +110,14 @@ async function run() {
             res.send(result)
         });
 
+// Search
+   app.get("/search", async(req, res) => {
+      const search_text = req.query.search
+      const result = await productCollection.find({productName: {$regex: search_text, $options: "i"}}).toArray()
+      res.send(result)
+    })
+
+
 //Export product
         app.get("/my-exports",  async(req, res) => {
       const email = req.query.email
@@ -119,7 +127,7 @@ async function run() {
     })   
     
     //Update Export
-app.put("/exports/:id",  async (req, res) => {
+app.put("/exports/:id", verifyToken, async (req, res) => {
       const { id } = req.params;
       const data = req.body;
       const objectId = new ObjectId(id);
@@ -138,7 +146,7 @@ app.put("/exports/:id",  async (req, res) => {
 
 
 //Delete Export 
- app.delete('/exports/:id', async(req, res) => {
+ app.delete('/exports/:id', verifyToken, async(req, res) => {
             const {id} = req.params
             const query = {_id: new ObjectId(id)}
             const result = await productCollection.deleteOne(query)
@@ -236,7 +244,7 @@ app.put("/exports/:id",  async (req, res) => {
   }
 });
 
-    app.get('/my-imports/:id',  async (req,res) => {
+    app.get('/my-imports/:id', verifyToken, async (req,res) => {
             const {id} = req.params;
             const query = new ObjectId(id);
             const result = await importsCollection.findOne({_id: query})
@@ -280,7 +288,7 @@ app.put("/exports/:id",  async (req, res) => {
   }
 });
         //delete operations
-        app.delete('/imports/:id', async(req, res) => {
+        app.delete('/imports/:id', verifyToken, async(req, res) => {
             const {id} = req.params
             const query = {_id: new ObjectId(id)}
             const result = await importsCollection.deleteOne(query)
