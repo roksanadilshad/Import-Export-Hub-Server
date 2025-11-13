@@ -70,7 +70,7 @@ async function run() {
         })
          //get operations
         app.get('/latest-products', async ( req, res ) => {
-            const cursor = productCollection.find().sort({createdAt: 1})
+            const cursor = productCollection.find().sort({createdAt: -1})
             const result = await cursor.toArray()
             res.send(result)
         })
@@ -122,8 +122,6 @@ async function run() {
 app.put("/exports/:id",  async (req, res) => {
       const { id } = req.params;
       const data = req.body;
-      // console.log(id)
-      // console.log(data)
       const objectId = new ObjectId(id);
       const filter = { _id: objectId };
       const update = {
@@ -154,7 +152,7 @@ app.put("/exports/:id",  async (req, res) => {
     // Import product
         app.post('/imports', async (req, res) => {
   try {
-    console.log("🧠 Import request body:", req.body);
+   // console.log("🧠 Import request body:", req.body);
 
     const { productId, import_by, quantity } = req.body;
 
