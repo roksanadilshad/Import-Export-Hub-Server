@@ -133,7 +133,7 @@ async function run() {
     })   
     
     //Update Export
-app.put("/exports/:id", verifyToken, async (req, res) => {
+app.put("/exports/:id", verifyToken,  async (req, res) => {
       const { id } = req.params;
       const data = req.body;
       const objectId = new ObjectId(id);
