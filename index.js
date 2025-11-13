@@ -74,6 +74,12 @@ async function run() {
             const result = await cursor.toArray()
             res.send(result)
         })
+         //Popular
+        app.get('/popular-products', async ( req, res ) => {
+            const cursor = productCollection.find().sort({rating: -1}).limit(6)
+            const result = await cursor.toArray()
+            res.send(result)
+        })
 
         //get a single 
         app.get('/products/:id', verifyToken, async (req,res) => {
@@ -146,7 +152,7 @@ app.put("/exports/:id", verifyToken, async (req, res) => {
 
 
 //Delete Export 
- app.delete('/exports/:id', verifyToken, async(req, res) => {
+ app.delete('/exports/:id', async(req, res) => {
             const {id} = req.params
             const query = {_id: new ObjectId(id)}
             const result = await productCollection.deleteOne(query)
@@ -288,7 +294,7 @@ app.put("/exports/:id", verifyToken, async (req, res) => {
   }
 });
         //delete operations
-        app.delete('/imports/:id', verifyToken, async(req, res) => {
+        app.delete('/imports/:id', async(req, res) => {
             const {id} = req.params
             const query = {_id: new ObjectId(id)}
             const result = await importsCollection.deleteOne(query)
