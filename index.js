@@ -63,11 +63,30 @@ async function run() {
         // const exportsCollection = skeletonDB.collection("exports")
         
          //get operations
-        app.get('/products', async ( req, res ) => {
-            const cursor = productCollection.find()
-            const result = await cursor.toArray()
-            res.send(result)
-        })
+        app.get('/products', async (req, res) => {
+    const page = parseInt(req.query.page) || 0;
+    const size = parseInt(req.query.size) || 9; // Items per page
+    const category = req.query.category;
+
+    // Filter by category if it's not "All"
+    let query = {};
+    if (category && category !== "All") {
+        query = { category: category };
+    }
+
+    const cursor = productCollection.find(query);
+    
+    // Get total count for the pagination buttons
+    const totalProducts = await productCollection.countDocuments(query);
+    
+    // Fetch specific page data
+    const products = await cursor
+        .skip(page * size)
+        .limit(size)
+        .toArray();
+
+    res.send({ totalProducts, products });
+});
          //get operations
         app.get('/latest-products', async ( req, res ) => {
             const cursor = productCollection.find().sort({createdAt: -1})
