@@ -65,27 +65,28 @@ async function run() {
          //get operations
         app.get('/products', async (req, res) => {
     const page = parseInt(req.query.page) || 0;
-    const size = parseInt(req.query.size) || 9; // Items per page
+    const size = parseInt(req.query.size) || 9;
     const category = req.query.category;
 
-    // Filter by category if it's not "All"
+    // Use a case-insensitive query for category
     let query = {};
     if (category && category !== "All") {
         query = { category: category };
     }
 
     const cursor = productCollection.find(query);
-    
-    // Get total count for the pagination buttons
-    const totalProducts = await productCollection.countDocuments(query);
-    
-    // Fetch specific page data
-    const products = await cursor
+    const result = await cursor
         .skip(page * size)
         .limit(size)
         .toArray();
 
-    res.send({ totalProducts, products });
+    const count = await productCollection.countDocuments(query);
+
+    // YOU MUST SEND AN OBJECT, NOT JUST THE ARRAY
+    res.send({ 
+        count: count, 
+        result: result 
+    }); 
 });
          //get operations
         app.get('/latest-products', async ( req, res ) => {
