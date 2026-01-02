@@ -62,7 +62,7 @@ async function run() {
         const importsCollection = skeletonDB.collection("imports")
         // const exportsCollection = skeletonDB.collection("exports")
         
-         //get operations
+         //get all operations
         app.get('/products', async (req, res) => {
     const { page, size, category, minPrice, maxPrice, minRating, sort } = req.query;
     
@@ -340,6 +340,38 @@ app.put("/exports/:id", verifyToken,  async (req, res) => {
               success: true,
               result})
         })
+
+        // Get stats for Dashboard Charts
+app.get('/category-stats', async (req, res) => {
+    try {
+        const stats = await productCollection.aggregate([
+            {
+                // Group by the category field
+                $group: {
+                    _id: "$category", 
+                    count: { $sum: 1 } // Increment count for each item
+                }
+            },
+            {
+                // Clean up the output for the frontend (rename _id to category)
+                $project: {
+                    category: "$_id",
+                    count: 1,
+                    _id: 0
+                }
+            },
+            {
+                // Optional: Sort alphabetically or by count
+                $sort: { count: -1 } 
+            }
+        ]).toArray();
+
+        res.send(stats);
+    } catch (error) {
+        console.error("Aggregation Error:", error);
+        res.status(500).send({ message: "Failed to fetch stats" });
+    }
+});
 
         //await client.db("admin").command({ ping: 1 });
          console.log("Pinged your deployment. You successfully connected to MongoDB!");
