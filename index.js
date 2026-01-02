@@ -64,29 +64,47 @@ async function run() {
         
          //get operations
         app.get('/products', async (req, res) => {
-    const page = parseInt(req.query.page) || 0;
-    const size = parseInt(req.query.size) || 9;
-    const category = req.query.category;
+    const { page, size, category, minPrice, maxPrice, minRating, sort } = req.query;
+    
+    const pageNum = parseInt(page) || 0;
+    const sizeNum = parseInt(size) || 9;
 
-    // Use a case-insensitive query for category
+    // 1. Build Query Object
     let query = {};
+    
+    // Category Filter
     if (category && category !== "All") {
-        query = { category: category };
+        query.category = category;
     }
 
-    const cursor = productCollection.find(query);
+    // Price Filter ($gte = Greater than or equal, $lte = Less than or equal)
+    query.price = { 
+        $gte: parseFloat(minPrice) || 0, 
+        $lte: parseFloat(maxPrice) || 1000000 
+    };
+
+    // Rating Filter
+    if (minRating) {
+        query.rating = { $gte: parseFloat(minRating) };
+    }
+
+    // 2. Build Sort Object
+    let sortObj = {};
+    if (sort === "price-asc") sortObj = { price: 1 };
+    else if (sort === "price-desc") sortObj = { price: -1 };
+    else if (sort === "rating") sortObj = { rating: -1 };
+    else sortObj = { createdAt: -1 }; // Default: Newest first
+
+    // 3. Execute
+    const cursor = productCollection.find(query).sort(sortObj);
     const result = await cursor
-        .skip(page * size)
-        .limit(size)
+        .skip(pageNum * sizeNum)
+        .limit(sizeNum)
         .toArray();
 
     const count = await productCollection.countDocuments(query);
 
-    // YOU MUST SEND AN OBJECT, NOT JUST THE ARRAY
-    res.send({ 
-        count: count, 
-        result: result 
-    }); 
+    res.send({ count, result });
 });
          //get operations
         app.get('/latest-products', async ( req, res ) => {
