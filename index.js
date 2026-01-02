@@ -82,7 +82,7 @@ async function run() {
         })
 
         //get a single 
-        app.get('/products/:id', verifyToken, async (req,res) => {
+        app.get('/products/:id',  async (req,res) => {
             const {id} = req.params;
             const query = new ObjectId(id);
             const result = await productCollection.findOne({_id: query})
